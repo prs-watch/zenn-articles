@@ -1,0 +1,28 @@
+{
+  "title": "[Python]pipenv + Github Actions覚書",
+  "closed": true,
+  "archived": false,
+  "created_at": "2022-01-30",
+  "comments": [
+    {
+      "author": "hctaw_srp",
+      "created_at": "2022-01-30",
+      "body_markdown": "作ったアプリケーション\n\nhttps://github.com/prs-watch/hof"
+    },
+    {
+      "author": "hctaw_srp",
+      "created_at": "2022-01-30",
+      "body_markdown": "# `pipenv`\n\n基本、Pythonバージョンの `npm` にvirtual-envを加えたパッケージマネージャーとのイメージ。\n\n- `package.json` -> `Pipfile`\n- `package-lock.json` -> `Pipfile.lock`\n\nこんな具合。\n\n## プロジェクト初期化\n\n仮想環境を作ってくれる。\n\n```bash\n$ pienv --python 3\n```\n\n指定バージョンのインタプリタが無い場合は、`pyenv` を介してダウンロードしてくれる。\n\n## パッケージインストール\n\n仮想環境にパッケージをインストールしてくれる。\n\n```bash\n$ pipenv install ${パッケージ名}\n```\n\ndevパッケージ（アプリケーションには依存しないが、テスト・ビルド等で利用する物）は `--dev` オプションを付ける。\n\n```bash\n$ pipenv install --dev ${パッケージ}\n```\n\n## 仮想環境上で処理実行\n\n`Pipfile` に書く。\n\n```:Pipfile\n[scripts]\n# テストコマンド\ntest = \"bash -c 'python -m pip install -e . && pytest tests'\"\n# ビルドコマンド\nbuild = \"bash -c 'python setup.py sdist && python setup.py bdist_wheel'\"\n```\n\n```bash\n$ pipenv run test\n```\n\n`npm run` と同じ。\n\n## 仮想環境に入る\n\n今回はコマンドラインツールを作ったので、`Pipfile` にスクリプトを書くよりも、仮想環境に入り、直にコマンドを書く形で動作チェックをした。\n\n```bash\n$ pipenv shell\n```"
+    },
+    {
+      "author": "hctaw_srp",
+      "created_at": "2022-01-30",
+      "body_markdown": "# `Github Actions`\n\n`pipenv` を交えて、`Github Actions` でテスト・リリースフローを作る。\n\nhttps://github.com/prs-watch/hof/tree/main/.github/workflows\n\n## `pipenv` で環境再現\n\n### `Pipfile.lock` 生成\n\nPythonバージョンを `Pipfile` で指定の上、`Github Actions` を回すと、指定バージョンのPythonインタプリタが存在しない場合、エラーになる。`pyenv` で入れてくれる訳では無いらしい。\n\nhttps://pipenv-ja.readthedocs.io/ja/translate-ja/basics.html#general-recommendations-version-control\n\n> 複数バージョンのPythonを対象とする場合は、 Pipfile.lock はバージョン管理に含めないでください。\n\nドキュメントに沿って、`Pipfile.lock` はバージョン管理に入れず、`Github Actions` の中でlockする様にする。\n\n```bash\n$ pipenv lock\n```\n\n### 環境再現\n\n```bash\n$ pipenv sync --dev\n```\n\nで、`Pipfile.lock` をベースにパッケージをインストール、環境を再現してくれる。\n\n## `Github Actions` のワークフロー化\n\n```yml:test.yml\nname: test\n\non:\n  push:\n    branches:\n      - main\n\njobs:\n  test:\n    runs-on: ubuntu-20.04\n    steps:\n      - name: checkout\n        uses: actions/checkout@v2\n\n      - name: install pipenv\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install pipenv\n      \n      - name: lock package version\n        run: pipenv lock\n      \n      - name: install packages\n        run: pipenv sync --dev\n      \n      - name: run test\n        run: pipenv run test\n```"
+    },
+    {
+      "author": "hctaw_srp",
+      "created_at": "2022-01-30",
+      "body_markdown": "リリースする場合は、`pipenv sync --dev` までは同一フローで、その先は `wheel` `twine` を交えたビルド・リリース処理を行う。\n\n```yml:release.yml\nname: release\n\non:\n  workflow_dispatch:\n\njobs:\n  release:\n    runs-on: ubuntu-20.04\n    steps:\n      - name: checkout\n        uses: actions/checkout@v2\n\n      - name: install pipenv\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install pipenv\n      \n      - name: lock package version\n        run: pipenv lock\n      \n      - name: install packages\n        run: pipenv sync --dev\n\n      - name: build\n        run: pipenv run build\n\n      - name: release\n        uses: pypa/gh-action-pypi-publish@master\n        with: \n          user: __token__\n          password: ${{ secrets.PYPI_API_TOKEN }}\n```"
+    }
+  ]
+}
