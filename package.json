@@ -18,6 +18,6 @@
   },
   "homepage": "https://github.com/prs-watch/zenn-articles#readme",
   "dependencies": {
-    "zenn-cli": "^0.1.106"
+    "zenn-cli": "0.1.112"
   }
 }
